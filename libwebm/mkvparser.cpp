@@ -2640,15 +2640,18 @@ bool Cues::Find(
     assert(pCP->GetTime(m_pSegment) <= time_ns);
 #endif
 
-    //TODO: here and elsewhere, it's probably not correct to search
-    //for the cue point with this time, and then search for a matching
-    //track.  In principle, the matching track could be on some earlier
-    //cue point, and with our current algorithm, we'd miss it.  To make
-    //this bullet-proof, we'd need to create a secondary structure,
-    //with a list of cue points that apply to a track, and then search
-    //that track-based structure for a matching cue point.
-
-    pTP = pCP->Find(pTrack);
+    //It's probably not correct to search for the cue point with this
+    //time, and then search for a matching track.  In principle, the
+    //matching track could be on some earlier cue point. So we recheck
+    //the earlier cue point if the track doesn't match.
+    long index = pCP->GetIndex();
+    while (index >= 0) {
+        pTP = pCP->Find(pTrack);
+        if (pTP == NULL)
+            pCP = m_cue_points[index--];
+        else
+            break;
+    }
     return (pTP != NULL);
 }
 
@@ -3192,6 +3195,10 @@ long long CuePoint::GetTime(const Segment* pSegment) const
     return time;
 }
 
+long CuePoint::GetIndex() const
+{
+    return m_index;
+}
 
 #if 0
 long long Segment::Unparsed() const
@@ -5760,7 +5767,7 @@ long Tracks::ParseTrackEntry(
 
         if (id == 0x60)  // VideoSettings ID
         {
-            if (size <= 0)
+            if (size < 0)
                 return E_FILE_FORMAT_INVALID;
 
             v.start = start;
@@ -5768,7 +5775,7 @@ long Tracks::ParseTrackEntry(
         }
         else if (id == 0x61)  // AudioSettings ID
         {
-            if (size <= 0)
+            if (size < 0)
                 return E_FILE_FORMAT_INVALID;
 
             a.start = start;
@@ -5776,7 +5783,7 @@ long Tracks::ParseTrackEntry(
         }
         else if (id == 0x2D80) // ContentEncodings ID
         {
-            if (size <= 0)
+            if (size < 0)
                 return E_FILE_FORMAT_INVALID;
 
             e.start = start;
