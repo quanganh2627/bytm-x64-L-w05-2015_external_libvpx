@@ -9,6 +9,11 @@ else ifeq ($(ARCH_ARM_HAVE_ARMV7A),true)
   libvpx_asm := .asm.s
 endif
 
+ifeq ($(TARGET_ARCH),x86)
+  libvpx_target := x86
+  libvpx_asm := .asm
+endif
+
 ifeq ($(TARGET_ARCH),mips)
   ifneq ($(ARCH_HAS_BIGENDIAN),true)
     ifeq ($(ARCH_MIPS_DSP_REV),2)
@@ -35,7 +40,6 @@ libvpx_source_dir := $(LOCAL_PATH)/libvpx
 libvpx_codec_srcs := $(shell cat $(libvpx_config_dir)/libvpx_srcs.txt)
 
 LOCAL_CFLAGS := -DHAVE_CONFIG_H=vpx_config.h
-
 LOCAL_MODULE := libvpx
 
 LOCAL_MODULE_CLASS := STATIC_LIBRARIES
@@ -44,6 +48,11 @@ libvpx_intermediates := $(call local-intermediates-dir)
 # Extract the C files from the list and add them to LOCAL_SRC_FILES.
 libvpx_codec_srcs_unique := $(sort $(libvpx_codec_srcs))
 libvpx_codec_srcs_c := $(filter %.c, $(libvpx_codec_srcs_unique))
+ifeq ($(libvpx_target),x86)
+x86_asm_src_files := $(filter %.asm, $(libvpx_codec_srcs_unique))
+X86_ASM_SRCS := $(addprefix $(LOCAL_PATH)/libvpx/, $(x86_asm_src_files))
+X86_ASM_OBJS := $(addprefix $(libvpx_intermediates)/, $(x86_asm_src_files:%.asm=%.asm.o))
+endif
 # vpx_config.c is an auto-generated file in $(config_dir)
 libvpx_codec_srcs_c_static := $(filter-out vpx_config.c, $(libvpx_codec_srcs_c))
 LOCAL_SRC_FILES += $(addprefix libvpx/, $(libvpx_codec_srcs_c_static))
@@ -59,6 +68,7 @@ LOCAL_SRC_FILES += $(libvpx_target)/vpx_config.c
 # to be named accordingly to avoid auto-build rules. The encoder files are not
 # used yet but are included in the comments for future reference.
 
+ifneq ($(libvpx_target),x86)
 libvpx_asm_offsets_intermediates := \
     vp8/encoder/vp8_asm_enc_offsets.intermediate \
     vpx_scale/vpx_scale_asm_offsets.intermediate \
@@ -67,6 +77,7 @@ libvpx_asm_offsets_files := \
     vp8/encoder/vp8_asm_enc_offsets.asm \
     vpx_scale/vpx_scale_asm_offsets.asm \
 
+endif
 # Build the S files with inline assembly.
 COMPILE_TO_S := $(addprefix $(libvpx_intermediates)/, $(libvpx_asm_offsets_intermediates))
 $(COMPILE_TO_S) : PRIVATE_INTERMEDIATES := $(libvpx_intermediates)
@@ -74,7 +85,7 @@ $(COMPILE_TO_S) : PRIVATE_SOURCE_DIR := $(libvpx_source_dir)
 $(COMPILE_TO_S) : PRIVATE_CONFIG_DIR := $(libvpx_config_dir)
 $(COMPILE_TO_S) : PRIVATE_CUSTOM_TOOL = $(TARGET_CC) -S $(addprefix -I, $(TARGET_C_INCLUDES)) -I $(PRIVATE_INTERMEDIATES) -I $(PRIVATE_SOURCE_DIR) -I $(PRIVATE_CONFIG_DIR) -DINLINE_ASM -o $@ $<
 $(COMPILE_TO_S) : $(libvpx_intermediates)/%.intermediate : $(libvpx_source_dir)/%.c
-	$(transform-generated-source)
+        $(transform-generated-source)
 
 # Extract the offsets from the inline assembly.
 OFFSETS_GEN := $(addprefix $(libvpx_intermediates)/, $(libvpx_asm_offsets_files))
@@ -82,7 +93,7 @@ $(OFFSETS_GEN) : PRIVATE_OFFSET_PATTERN := '^[a-zA-Z0-9_]* EQU'
 $(OFFSETS_GEN) : PRIVATE_SOURCE_DIR := $(libvpx_source_dir)
 $(OFFSETS_GEN) : PRIVATE_CUSTOM_TOOL = grep $(PRIVATE_OFFSET_PATTERN) $< | tr -d '$$\#' | perl $(PRIVATE_SOURCE_DIR)/build/make/ads2gas.pl > $@
 $(OFFSETS_GEN) : %.asm : %.intermediate
-	$(transform-generated-source)
+        $(transform-generated-source)
 
 LOCAL_GENERATED_SOURCES += $(OFFSETS_GEN)
 
@@ -95,9 +106,19 @@ VPX_GEN := $(addprefix $(libvpx_intermediates)/, $(libvpx_asm_srcs))
 $(VPX_GEN) : PRIVATE_SOURCE_DIR := $(libvpx_source_dir)
 $(VPX_GEN) : PRIVATE_CUSTOM_TOOL = cat $< | perl $(PRIVATE_SOURCE_DIR)/build/make/ads2gas.pl > $@
 $(VPX_GEN) : $(libvpx_intermediates)/%.s : $(libvpx_source_dir)/%
-	$(transform-generated-source)
+        $(transform-generated-source)
 
 LOCAL_GENERATED_SOURCES += $(VPX_GEN)
+
+ifeq ($(libvpx_target),x86)
+$(X86_ASM_OBJS) : $(X86_ASM_SRCS)
+$(libvpx_intermediates)/%.asm.o: $(LOCAL_PATH)/libvpx/%.asm
+	mkdir -p `dirname $@`
+	yasm -f elf32 -I$(LOCAL_PATH)/ -I$(LOCAL_PATH)/x86/ -I$(LOCAL_PATH)/libvpx/ -o $@ $<
+
+LOCAL_GENERATED_SOURCES += $(X86_ASM_OBJS)
+LOCAL_PREBUILT_MODULE_FILE += $(X86_ASM_OBJS)
+endif
 
 LOCAL_C_INCLUDES := \
     $(libvpx_source_dir) \
@@ -121,3 +142,36 @@ libvpx_asm_offsets_files :=
 libvpx_asm_srcs :=
 
 include $(BUILD_STATIC_LIBRARY)
+
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := \
+        libvpx/vpxdec.c \
+        libvpx/tools_common.c \
+        libvpx/md5_utils.c \
+        libvpx/args.c \
+        libvpx/nestegg/halloc/src/halloc.c \
+        libvpx/nestegg/src/nestegg.c \
+        libvpx/third_party/libyuv/source/scale.c \
+        libvpx/third_party/libyuv/source/cpu_id.c \
+
+LOCAL_CFLAGS += \
+    -DANDROID
+
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/x86 \
+    $(LOCAL_PATH)/libvpx \
+    $(LOCAL_PATH)/libvpx/vpx \
+    $(LOCAL_PATH)/libvpx/vpx_ports \
+    $(LOCAL_PATH)/libvpx/nestegg/halloc \
+    $(LOCAL_PATH)/libvpx/nestegg/include/nestegg \
+    $(LOCAL_PATH)/libvpx/third_party/libyuv/source \
+    $(LOCAL_PATH)/libvpx/third_party/libyuv/include/libyuv \
+    $(LOCAL_PATH)/libvpx/vpx_scale \
+
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE := vpxdec
+
+LOCAL_STATIC_LIBRARIES := libvpx libwebm
+
+include $(BUILD_EXECUTABLE)
