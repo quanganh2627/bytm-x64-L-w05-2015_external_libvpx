@@ -111,10 +111,11 @@ $(VPX_GEN) : $(libvpx_intermediates)/%.s : $(libvpx_source_dir)/%
 LOCAL_GENERATED_SOURCES += $(VPX_GEN)
 
 ifeq ($(libvpx_target),x86)
+yasm := $(TOP)/prebuilts/misc/linux-x86/yasm/yasm
 $(X86_ASM_OBJS) : $(X86_ASM_SRCS)
 $(libvpx_intermediates)/%.asm.o: $(LOCAL_PATH)/libvpx/%.asm
 	mkdir -p `dirname $@`
-	yasm -f elf32 -I$(LOCAL_PATH)/ -I$(LOCAL_PATH)/x86/ -I$(LOCAL_PATH)/libvpx/ -o $@ $<
+	$(yasm) -f elf32 -I$(TOP)/external/libvpx/ -I$(TOP)/external/libvpx/x86/ -I$(TOP)/external/libvpx/libvpx/ -o $@ $<
 
 LOCAL_GENERATED_SOURCES += $(X86_ASM_OBJS)
 LOCAL_PREBUILT_MODULE_FILE += $(X86_ASM_OBJS)
