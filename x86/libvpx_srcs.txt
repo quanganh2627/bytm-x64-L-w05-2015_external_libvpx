@@ -2,7 +2,6 @@ build/make/rtcd.sh
 build/make/version.sh
 CHANGELOG
 libs.mk
-../x86/vp8_asm_enc_offsets.asm
 third_party/x86inc/x86inc.asm
 vpx_ports/emms.asm
 vp8/common/generic/systemdependent.c
@@ -72,6 +71,7 @@ vp8/encoder/x86/subtract_mmx.asm
 vp8/encoder/x86/fwalsh_sse2.asm
 vp8/encoder/x86/quantize_ssse3.asm
 vp8/encoder/x86/temporal_filter_apply_sse2.asm
+vp8/encoder/x86/vp8_asm_enc_offsets.asm
 vp8/common/header.h
 vp8/common/idct_blk.c
 vp8/common/idctllm.c
