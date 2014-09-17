@@ -3,7 +3,8 @@
 # libvpx_codec_srcs_c_x86_64
 # libvpx_codec_srcs_asm_x86_64
 
-libvpx_target := generic
+libvpx_target := x86
+#libvpx_target := generic
 
 libvpx_config_dir_x86_64 := $(LOCAL_PATH)/$(libvpx_target)
 libvpx_codec_srcs := $(sort $(shell cat $(libvpx_config_dir_x86_64)/libvpx_srcs.txt))

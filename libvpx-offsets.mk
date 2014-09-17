@@ -62,6 +62,36 @@ $(VPX_GEN) : $(libvpx_intermediates)/%.s : $(libvpx_source_dir)/%
 LOCAL_GENERATED_SOURCES_$(TARGET_$(libvpx_2nd_arch)ARCH) += $(VPX_GEN)
 endif
 
+# Extract the C files from the list and add them to LOCAL_SRC_FILES.
+libvpx_codec_srcs_unique := $(sort $(libvpx_codec_srcs))
+libvpx_codec_srcs_c := $(filter %.c, $(libvpx_codec_srcs_unique))
+
+ifeq ($(libvpx_target),x86)
+x86_asm_src_files := $(filter %.asm, $(libvpx_codec_srcs_unique))
+X86_ASM_SRCS := $(addprefix $(LOCAL_PATH)/libvpx/, $(x86_asm_src_files))
+X86_ASM_OBJS := $(addprefix $(libvpx_intermediates)/, $(x86_asm_src_files:%.asm=%.asm.o))
+
+libvpx_x86_asm_src_files := $(filter %.asm, $(libvpx_codec_srcs))
+libvpx_x86_yasm_dir := prebuilts/misc/linux-x86/yasm
+
+X86_ASM_GEN := $(addprefix $(libvpx_intermediates)/, $(libvpx_x86_asm_src_files:%.asm=%.asm.o))
+
+# Adding dependency on yasm generation
+$(X86_ASM_GEN) : $(libvpx_x86_yasm_dir)/yasm
+
+$(X86_ASM_GEN) : PRIVATE_YASM := $(libvpx_x86_yasm_dir)/yasm
+$(X86_ASM_GEN) : PRIVATE_SOURCE_DIR := $(libvpx_source_dir)
+$(X86_ASM_GEN) : PRIVATE_CONFIG_DIR := $(libvpx_config_dir_x86)
+$(X86_ASM_GEN) : PRIVATE_CUSTOM_TOOL = $(PRIVATE_YASM) -f elf32 -I $(PRIVATE_SOURCE_DIR) -I $(PRIVATE_CONFIG_DIR) -o $@ $<
+$(X86_ASM_GEN) : $(libvpx_intermediates)/%.o : $(libvpx_source_dir)/%
+	$(transform-generated-source)
+
+LOCAL_GENERATED_SOURCES_$(TARGET_$(libvpx_2nd_arch)ARCH) += $(X86_ASM_GEN)
+
+libvpx_x86_yasm_dir :=
+x86_asm_src_files :=
+endif
+
 LOCAL_C_INCLUDES_$(TARGET_$(libvpx_2nd_arch)ARCH) += \
     $(libvpx_intermediates)/vp8/common \
     $(libvpx_intermediates)/vp8/decoder \
